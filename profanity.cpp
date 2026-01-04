@@ -196,6 +196,8 @@ int main(int argc, char ** argv) {
 		bool bModeTronSequential = false;
 		std::string strModeTronSuffix;
 		bool bModeTronLucky = false;
+		size_t repeatCount = 4;     // 豹子号最少位数，默认4
+		size_t sequentialCount = 4; // 顺子号最少位数，默认4
 
 		// 设备和性能参数
 		size_t worksizeLocal = 0;  // 0 表示自动检测
@@ -219,6 +221,8 @@ int main(int argc, char ** argv) {
 		argp.addSwitch('S', "tron-sequential", bModeTronSequential);
 		argp.addSwitch('T', "tron-suffix", strModeTronSuffix);
 		argp.addSwitch('L', "tron-lucky", bModeTronLucky);
+		argp.addSwitch('r', "repeat-count", repeatCount);
+		argp.addSwitch('s', "sequential-count", sequentialCount);
 
 		// 设备控制
 		argp.addSwitch('n', "no-cache", bNoCache);
@@ -253,9 +257,9 @@ int main(int argc, char ** argv) {
 		if (bBenchmark) {
 			mode = Mode::benchmark();
 		} else if (bModeTronRepeat) {
-			mode = Mode::tronRepeat();
+			mode = Mode::tronRepeat(repeatCount);
 		} else if (bModeTronSequential) {
-			mode = Mode::tronSequential();
+			mode = Mode::tronSequential(sequentialCount);
 		} else if (!strModeTronSuffix.empty()) {
 			mode = Mode::tronSuffix(strModeTronSuffix);
 		} else if (bModeTronLucky) {

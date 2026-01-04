@@ -7,15 +7,21 @@
 ### 🐆 豹子号 (Leopard Number)
 生成末尾重复字符的地址
 - 例如: `T...AAAA`, `T...8888`, `T...aaaa`
+- 默认最少4位重复，可自定义 2-10 位
 - 命令: `./tron-vanity --tron-repeat`
+- 指定位数: `./tron-vanity --tron-repeat --repeat-count 6`
 
 ### 📈 顺子号 (Sequential Number)
 生成末尾连续递增或递减字符的地址
 - 例如: `T...12345`, `T...54321`, `T...abcde`
+- 默认最少4位连续，可自定义 2-10 位
 - 命令: `./tron-vanity --tron-sequential`
+- 指定位数: `./tron-vanity --tron-sequential --sequential-count 5`
 
 ### 🎯 自定义后缀 (Custom Suffix)
 支持自定义任意后缀匹配
+- **单个后缀最长**: 18 个字符
+- **多个后缀总长度**: 不超过 20 字符（包含分隔符）
 - 单个后缀: `./tron-vanity --tron-suffix 888`
 - 多个后缀: `./tron-vanity --tron-suffix 888,999,666`
 - 使用通配符: `./tron-vanity --tron-suffix 888XXX`
@@ -41,11 +47,17 @@ make
 # 查看帮助
 ./tron-vanity --help
 
-# 豹子号
+# 豹子号 - 默认至少4位重复
 ./tron-vanity --tron-repeat
 
-# 顺子号
+# 豹子号 - 指定至少6位重复
+./tron-vanity --tron-repeat --repeat-count 6
+
+# 顺子号 - 默认至少4位连续
 ./tron-vanity --tron-sequential
+
+# 顺子号 - 指定至少5位连续
+./tron-vanity --tron-sequential --sequential-count 5
 
 # 自定义后缀
 ./tron-vanity --tron-suffix 888

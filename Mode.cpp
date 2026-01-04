@@ -15,17 +15,19 @@ Mode Mode::benchmark() {
 
 // TRON vanity address modes
 
-Mode Mode::tronRepeat() {
+Mode Mode::tronRepeat(size_t minCount) {
 	Mode r;
-	r.name = "tron-repeat (豹子号)";
+	r.name = "tron-repeat (豹子号, 最少" + std::to_string(minCount) + "位)";
 	r.kernel = "profanity_score_tron_repeat";
+	r.data1[0] = static_cast<cl_uchar>(minCount); // 存储最少位数
 	return r;
 }
 
-Mode Mode::tronSequential() {
+Mode Mode::tronSequential(size_t minCount) {
 	Mode r;
-	r.name = "tron-sequential (顺子号)";
+	r.name = "tron-sequential (顺子号, 最少" + std::to_string(minCount) + "位)";
 	r.kernel = "profanity_score_tron_sequential";
+	r.data1[0] = static_cast<cl_uchar>(minCount); // 存储最少位数
 	return r;
 }
 

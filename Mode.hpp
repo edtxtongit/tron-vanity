@@ -15,8 +15,8 @@ class Mode {
 
 	public:
 		// TRON vanity address modes
-		static Mode tronRepeat();                         // 豹子号
-		static Mode tronSequential();                     // 顺子号
+		static Mode tronRepeat(size_t minCount = 4);      // 豹子号，minCount=最少重复位数
+		static Mode tronSequential(size_t minCount = 4);  // 顺子号，minCount=最少连续位数
 		static Mode tronSuffix(const std::string suffix); // 自定义后缀
 		static Mode tronLucky();                          // 谐音靓号
 		static Mode benchmark();                          // 性能测试

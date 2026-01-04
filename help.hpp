@@ -12,10 +12,13 @@ Usage: ./tron-vanity [OPTIONS]
 TRON 靓号模式 (必选其一):
   -R, --tron-repeat       豹子号: 末尾重复字符
                           例如: ...AAAA, ...8888, ...aaaa
+  -r, --repeat-count <n>  豹子号最少位数 [默认: 4, 范围: 2-10]
   -S, --tron-sequential   顺子号: 末尾连续递增/递减字符
                           例如: ...12345, ...54321, ...abcde
+  -s, --sequential-count <n> 顺子号最少位数 [默认: 4, 范围: 2-10]
   -T, --tron-suffix <str> 自定义后缀: 匹配指定后缀
                           支持 'X' 作为通配符, 逗号分隔多个后缀
+                          单个后缀最长18字符, 所有后缀总长度不超过20字符
                           例如: 888, 5211314, 888XXX, 888,999,666
   -L, --tron-lucky        谐音靓号: 匹配中国吉祥数字
                           例如: 5211314, 1314521, 168888, 888888, 666666
@@ -38,8 +41,14 @@ TRON 靓号模式 (必选其一):
   -I, --inverse-multiple  并行运行的工作项数量 [默认: 自动]
 
 使用示例:
-  # 豹子号 - 寻找末尾重复字符的地址
+  # 豹子号 - 寻找末尾至少4位重复字符的地址
   ./tron-vanity --tron-repeat
+
+  # 豹子号 - 寻找末尾至少6位重复字符的地址
+  ./tron-vanity --tron-repeat --repeat-count 6
+
+  # 顺子号 - 寻找末尾至少5位连续字符的地址
+  ./tron-vanity --tron-sequential --sequential-count 5
 
   # 自定义后缀 - 寻找以 888 结尾的地址
   ./tron-vanity --tron-suffix 888

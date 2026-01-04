@@ -841,7 +841,7 @@ int tron_base58_encode(const uchar * const input21, char * out) {
 }
 
 // 豹子号 (Leopard number): Score on trailing repeated characters
-// data1[0] = minimum required repeat count
+// data1[0] = minimum required repeat count (default 4)
 __kernel void profanity_score_tron_repeat(__global mp_number * const pInverse, __global result * const pResult, __constant const uchar * const data1, __constant const uchar * const data2, const uchar scoreMax) {
 	const size_t id = get_global_id(0);
 	__global const uchar * const hash = pInverse[id].d;
@@ -857,6 +857,10 @@ __kernel void profanity_score_tron_repeat(__global mp_number * const pInverse, _
 	char base58[35];
 	int len = tron_base58_encode(tronAddr, base58);
 
+	// Get minimum required count
+	int minCount = data1[0];
+	if (minCount < 2) minCount = 4; // 默认4位
+
 	// Count trailing repeated characters
 	int score = 1;
 	if (len >= 2) {
@@ -870,10 +874,16 @@ __kernel void profanity_score_tron_repeat(__global mp_number * const pInverse, _
 		}
 	}
 
+	// Only report if meets minimum count requirement
+	if (score < minCount) {
+		score = 0;
+	}
+
 	profanity_result_update(id, hash, pResult, score, scoreMax);
 }
 
 // 顺子号 (Sequential number): Score on trailing sequential characters (ascending or descending)
+// data1[0] = minimum required sequential count (default 4)
 // Supports sequences like: 123456, 654321, abcdef, fedcba
 __kernel void profanity_score_tron_sequential(__global mp_number * const pInverse, __global result * const pResult, __constant const uchar * const data1, __constant const uchar * const data2, const uchar scoreMax) {
 	const size_t id = get_global_id(0);
@@ -889,6 +899,10 @@ __kernel void profanity_score_tron_sequential(__global mp_number * const pInvers
 	// Encode to Base58
 	char base58[35];
 	int len = tron_base58_encode(tronAddr, base58);
+
+	// Get minimum required count
+	int minCount = data1[0];
+	if (minCount < 2) minCount = 4; // 默认4位
 
 	if (len < 2) {
 		profanity_result_update(id, hash, pResult, 0, scoreMax);
@@ -916,6 +930,11 @@ __kernel void profanity_score_tron_sequential(__global mp_number * const pInvers
 	}
 
 	int score = ascScore > descScore ? ascScore : descScore;
+
+	// Only report if meets minimum count requirement
+	if (score < minCount) {
+		score = 0;
+	}
 
 	profanity_result_update(id, hash, pResult, score, scoreMax);
 }
