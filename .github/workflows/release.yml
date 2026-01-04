@@ -37,13 +37,15 @@ jobs:
           path: tron-vanity-linux-x64.tar.gz
 
   build-macos-intel:
-    runs-on: macos-13
+    runs-on: macos-14
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build
-        run: make
+      - name: Build for x86_64
+        run: |
+          make clean || true
+          make CFLAGS="-c -std=c++11 -Wall -O2 -arch x86_64" LDFLAGS="-framework OpenCL -arch x86_64"
 
       - name: Package
         run: |
