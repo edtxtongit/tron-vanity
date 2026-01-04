@@ -11,6 +11,8 @@
 
 #if defined(__APPLE__) || defined(__MACOSX)
 #include <machine/endian.h>
+#elif defined(_WIN32) || defined(_WIN64)
+#include <winsock2.h>
 #else
 #include <arpa/inet.h>
 #endif
