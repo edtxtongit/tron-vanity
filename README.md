@@ -8,6 +8,10 @@
 
 High-performance TRON vanity address generator with GPU/CPU OpenCL acceleration.
 
+### 🎬 Demo
+
+![Running Demo](images/2026-01-04%2023-18-38.gif)
+
 ### ✨ Features
 
 | Mode | Description | Example |
@@ -103,6 +107,10 @@ Generated addresses are saved to `output/` directory:
 ## 中文
 
 高性能 TRON 网络靓号地址生成器，使用 GPU/CPU OpenCL 加速计算。
+
+### 🎬 运行演示
+
+![运行演示](images/2026-01-04%2023-18-38.gif)
 
 ### ✨ 功能特点
 
