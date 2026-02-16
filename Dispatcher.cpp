@@ -306,39 +306,59 @@ static void saveToFile(const std::string& address, const std::string& privateKey
 static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score, const std::chrono::time_point<std::chrono::steady_clock> & timeStart, const Mode & mode, const std::string & seedPrivateKey = "") {
 	const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - timeStart).count();
 
-	// Format private key offset
-	cl_ulong carry = 0;
+	// --- 1. 修正私钥偏移量计算 ---
 	cl_ulong4 seedRes;
+	cl_ulong carry = 0;
 
-	seedRes.s[0] = seed.s[0] + round; carry = seedRes.s[0] < round;
-	seedRes.s[1] = seed.s[1] + carry; carry = !seedRes.s[1];
-	seedRes.s[2] = seed.s[2] + carry; carry = !seedRes.s[2];
-	seedRes.s[3] = seed.s[3] + carry + r.foundId;
+	// GPU 偏移量 (foundId) 和 CPU 轮数 (round) 应该加在最低位 s[0]
+	cl_ulong totalLow = round + r.foundId;
+	
+	// 计算 s[0] 并处理进位
+	seedRes.s[0] = seed.s[0] + totalLow;
+	carry = (seedRes.s[0] < totalLow) ? 1 : 0;
 
+	// 处理 s[1] 的进位
+	seedRes.s[1] = seed.s[1] + carry;
+	carry = (carry != 0 && seedRes.s[1] == 0) ? 1 : 0;
+
+	// 处理 s[2] 的进位
+	seedRes.s[2] = seed.s[2] + carry;
+	carry = (carry != 0 && seedRes.s[2] == 0) ? 1 : 0;
+
+	// 处理 s[3]
+	seedRes.s[3] = seed.s[3] + carry;
+
+	// 将偏移量格式化为 64 位大端序十六进制字符串
 	std::ostringstream ss;
 	ss << std::hex << std::setfill('0');
-	ss << std::setw(16) << seedRes.s[3] << std::setw(16) << seedRes.s[2] << std::setw(16) << seedRes.s[1] << std::setw(16) << seedRes.s[0];
+	ss << std::setw(16) << seedRes.s[3] 
+	   << std::setw(16) << seedRes.s[2] 
+	   << std::setw(16) << seedRes.s[1] 
+	   << std::setw(16) << seedRes.s[0];
 	const std::string strPrivate = ss.str();
 
-	// Generate TRON address (Base58Check encoding)
+	// --- 2. 生成波场地址 (Base58Check) ---
 	uint8_t tronAddr[21];
-	tronAddr[0] = 0x41;
+	tronAddr[0] = 0x41; // 波场主网前缀
 	for (int i = 0; i < 20; i++) {
 		tronAddr[i + 1] = r.foundHash[i];
 	}
 	std::string strAddress = toBase58Check(tronAddr);
 
-	// Print result
+	// --- 3. 打印结果 ---
 	const std::string strVT100ClearLine = "\33[2K\r";
 	std::cout << strVT100ClearLine << "  时间: " << std::setw(5) << seconds << "s 分数: " << std::setw(2) << (int)score
 	          << " 地址: " << strAddress << std::endl;
 
-	// Calculate final private key and save to file
+	// --- 4. 计算并保存最终私钥 ---
 	if (!seedPrivateKey.empty()) {
+		// 使用 addPrivateKeys 执行 (种子私钥 + 计算出的偏移量) mod N
 		std::string finalPrivateKey = addPrivateKeys(seedPrivateKey, strPrivate);
-		// 加密显示私钥：只显示前6位和后6位，中间用*号代替
+		
+		// 掩码显示，保护隐私
 		std::string maskedKey = finalPrivateKey.substr(0, 6) + std::string(52, '*') + finalPrivateKey.substr(58, 6);
 		std::cout << "  私钥: 0x" << maskedKey << std::endl;
+		
 		saveToFile(strAddress, "0x" + finalPrivateKey);
 	}
 }
