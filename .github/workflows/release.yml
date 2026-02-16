@@ -12,6 +12,7 @@ permissions:
 jobs:
   build-linux:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -19,21 +20,22 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ocl-icd-opencl-dev opencl-headers g++
+          sudo apt-get install -y ocl-icd-opencl-dev opencl-headers
 
-      - name: Build (Static Linkage)
-        # 解释：-static-libgcc -static-libstdc++ 静态链接基础库
-        # LDFLAGS 中加入 -Wl,-Bstatic -l... -Wl,-Bdynamic 可以尝试静态链接其他库
+      - name: Build (Static)
         run: |
           make clean || true
-          make LDFLAGS="-L/usr/lib/x86_64-linux-gnu -lOpenCL -static-libgcc -static-libstdc++"
+          make CC=g++ \
+            CFLAGS="-std=c++11 -O2 -Wall -static -static-libgcc -static-libstdc++ -DCL_TARGET_OPENCL_VERSION=120" \
+            LDFLAGS="-lOpenCL -static -static-libgcc -static-libstdc++"
 
       - name: Package
         run: |
           mkdir -p dist
           cp tron-vanity dist/
-          cp README.md dist/ 2>/dev/null || touch dist/README.md
-          cp *.cl dist/
+          cp README.md dist/
+          cp profanity.cl dist/
+          cp keccak.cl dist/
           cd dist && tar -czvf ../tron-vanity-linux-x64.tar.gz *
 
       - name: Upload artifact
@@ -42,36 +44,67 @@ jobs:
           name: tron-vanity-linux-x64
           path: tron-vanity-linux-x64.tar.gz
 
-  build-macos:
-    strategy:
-      matrix:
-        arch: [x86_64, arm64]
-    runs-on: macos-latest
+  build-macos-intel:
+    runs-on: macos-14
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build
+      - name: Build (Semi-static x86_64)
         run: |
           make clean || true
-          make CFLAGS="-c -std=c++11 -Wall -O2 -arch ${{ matrix.arch }}" LDFLAGS="-framework OpenCL -arch ${{ matrix.arch }}"
+          make CC=clang++ \
+            CFLAGS="-std=c++11 -O2 -Wall -arch x86_64 -DCL_TARGET_OPENCL_VERSION=120" \
+            LDFLAGS="-framework OpenCL -arch x86_64 -static-libstdc++"
 
       - name: Package
         run: |
           mkdir -p dist
           cp tron-vanity dist/
-          cp README.md dist/ 2>/dev/null || touch dist/README.md
-          cp *.cl dist/
-          cd dist && tar -czvf ../tron-vanity-macos-${{ matrix.arch }}.tar.gz *
+          cp README.md dist/
+          cp profanity.cl dist/
+          cp keccak.cl dist/
+          cd dist && tar -czvf ../tron-vanity-macos-x64.tar.gz *
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tron-vanity-macos-${{ matrix.arch }}
-          path: tron-vanity-macos-${{ matrix.arch }}.tar.gz
+          name: tron-vanity-macos-x64
+          path: tron-vanity-macos-x64.tar.gz
+
+  build-macos-arm:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build (Semi-static arm64)
+        run: |
+          make clean || true
+          make CC=clang++ \
+            CFLAGS="-std=c++11 -O2 -Wall -arch arm64 -DCL_TARGET_OPENCL_VERSION=120" \
+            LDFLAGS="-framework OpenCL -arch arm64 -static-libstdc++"
+
+      - name: Package
+        run: |
+          mkdir -p dist
+          cp tron-vanity dist/
+          cp README.md dist/
+          cp profanity.cl dist/
+          cp keccak.cl dist/
+          cd dist && tar -czvf ../tron-vanity-macos-arm64.tar.gz *
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tron-vanity-macos-arm64
+          path: tron-vanity-macos-arm64.tar.gz
 
   build-windows:
     runs-on: windows-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -84,22 +117,25 @@ jobs:
           install: >-
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-opencl-icd
+            mingw-w64-x86_64-opencl-headers
             make
 
-      - name: Build (Full Static)
+      - name: Build (Static)
         shell: msys2 {0}
-        # 关键：-static 强制静态链接几乎所有库，避免缺少 libwinpthread/libstdc++-6.dll
         run: |
           make clean || true
-          make CC=g++ LDFLAGS="-s -lOpenCL -Wl,-Bstatic -lpthread -static-libgcc -static-libstdc++ -static" CFLAGS="-c -std=c++11 -Wall -O2 -DCL_TARGET_OPENCL_VERSION=120"
+          make CC=g++ \
+            CFLAGS="-std=c++11 -O2 -Wall -DCL_TARGET_OPENCL_VERSION=120" \
+            LDFLAGS="-lOpenCL -lws2_32 -static -static-libgcc -static-libstdc++"
 
       - name: Package
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist
           Copy-Item tron-vanity.exe dist/
-          Copy-Item README.md dist/ -ErrorAction SilentlyContinue
-          Copy-Item *.cl dist/
+          Copy-Item README.md dist/
+          Copy-Item profanity.cl dist/
+          Copy-Item keccak.cl dist/
           Compress-Archive -Path dist/* -DestinationPath tron-vanity-windows-x64.zip
 
       - name: Upload artifact
@@ -109,9 +145,10 @@ jobs:
           path: tron-vanity-windows-x64.zip
 
   release:
-    needs: [build-linux, build-macos, build-windows]
+    needs: [build-linux, build-macos-intel, build-macos-arm, build-windows]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
+
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -123,7 +160,7 @@ jobs:
         with:
           files: |
             artifacts/tron-vanity-linux-x64/tron-vanity-linux-x64.tar.gz
-            artifacts/tron-vanity-macos-x86_64/tron-vanity-macos-x86_64.tar.gz
+            artifacts/tron-vanity-macos-x64/tron-vanity-macos-x64.tar.gz
             artifacts/tron-vanity-macos-arm64/tron-vanity-macos-arm64.tar.gz
             artifacts/tron-vanity-windows-x64/tron-vanity-windows-x64.zip
           draft: false
