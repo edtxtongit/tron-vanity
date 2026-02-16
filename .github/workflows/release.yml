@@ -1,27 +1,29 @@
 name: Build and Release
+
 on:
   push:
     tags:
       - 'v*'
   workflow_dispatch:
+
 permissions:
   contents: write
+
 jobs:
   build-linux:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y ocl-icd-opencl-dev opencl-headers
+
       - name: Build
-        run: |
-          make clean || true
-          make CFLAGS+="-DCL_TARGET_OPENCL_VERSION=120" LDFLAGS+="-static-libgcc -static-libstdc++"
-      - name: Strip binary
-        run: strip tron-vanity
+        run: make
+
       - name: Package
         run: |
           mkdir -p dist
@@ -30,22 +32,24 @@ jobs:
           cp profanity.cl dist/
           cp keccak.cl dist/
           cd dist && tar -czvf ../tron-vanity-linux-x64.tar.gz *
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: tron-vanity-linux-x64
           path: tron-vanity-linux-x64.tar.gz
+
   build-macos-intel:
     runs-on: macos-14
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Build for x86_64
         run: |
           make clean || true
-          make CFLAGS="-c -std=c++11 -Wall -O2 -arch x86_64 -DCL_TARGET_OPENCL_VERSION=120" LDFLAGS="-framework OpenCL -arch x86_64"
-      - name: Strip binary
-        run: strip tron-vanity
+          make CFLAGS="-c -std=c++11 -Wall -O2 -arch x86_64" LDFLAGS="-framework OpenCL -arch x86_64"
+
       - name: Package
         run: |
           mkdir -p dist
@@ -54,22 +58,22 @@ jobs:
           cp profanity.cl dist/
           cp keccak.cl dist/
           cd dist && tar -czvf ../tron-vanity-macos-x64.tar.gz *
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: tron-vanity-macos-x64
           path: tron-vanity-macos-x64.tar.gz
+
   build-macos-arm:
     runs-on: macos-14
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Build
-        run: |
-          make clean || true
-          make CFLAGS+="-DCL_TARGET_OPENCL_VERSION=120"
-      - name: Strip binary
-        run: strip tron-vanity
+        run: make
+
       - name: Package
         run: |
           mkdir -p dist
@@ -78,16 +82,19 @@ jobs:
           cp profanity.cl dist/
           cp keccak.cl dist/
           cd dist && tar -czvf ../tron-vanity-macos-arm64.tar.gz *
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: tron-vanity-macos-arm64
           path: tron-vanity-macos-arm64.tar.gz
+
   build-windows:
     runs-on: windows-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Setup MSYS2
         uses: msys2/setup-msys2@v2
         with:
@@ -98,14 +105,12 @@ jobs:
             mingw-w64-x86_64-opencl-icd
             mingw-w64-x86_64-opencl-headers
             make
+
       - name: Build
         shell: msys2 {0}
         run: |
-          make clean || true
-          make CC=g++ LDFLAGS="-static-libgcc -static-libstdc++ -Wl,-Bstatic -Wl,--whole-archive -lpthread -Wl,--no-whole-archive -Wl,-Bdynamic -lOpenCL -lws2_32" CFLAGS="-c -std=c++11 -Wall -O2 -faligned-new -DCL_TARGET_OPENCL_VERSION=120"
-      - name: Strip binary
-        shell: msys2 {0}
-        run: strip tron-vanity.exe
+          make CC=g++ LDFLAGS="-lOpenCL -lws2_32 -static-libgcc -static-libstdc++" CFLAGS="-c -std=c++11 -Wall -O2 -faligned-new -DCL_TARGET_OPENCL_VERSION=120"
+
       - name: Package
         shell: pwsh
         run: |
@@ -115,11 +120,13 @@ jobs:
           Copy-Item profanity.cl dist/
           Copy-Item keccak.cl dist/
           Compress-Archive -Path dist/* -DestinationPath tron-vanity-windows-x64.zip
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: tron-vanity-windows-x64
           path: tron-vanity-windows-x64.zip
+
   release:
     needs: [build-linux, build-macos-intel, build-macos-arm, build-windows]
     runs-on: ubuntu-latest
@@ -129,6 +136,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
