@@ -102,7 +102,7 @@ jobs:
         shell: msys2 {0}
         run: |
           make clean || true
-          make CC=g++ LDFLAGS="-lOpenCL -lws2_32 -static-libgcc -static-libstdc++" CFLAGS="-c -std=c++11 -Wall -O2 -faligned-new -DCL_TARGET_OPENCL_VERSION=120"
+          make CC=g++ LDFLAGS="-static -lOpenCL -lws2_32" CFLAGS="-c -std=c++11 -Wall -O2 -faligned-new -DCL_TARGET_OPENCL_VERSION=120"
       - name: Strip binary
         shell: msys2 {0}
         run: strip tron-vanity.exe
