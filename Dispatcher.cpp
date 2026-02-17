@@ -306,28 +306,29 @@ static void saveToFile(const std::string& address, const std::string& privateKey
 static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score, const std::chrono::time_point<std::chrono::steady_clock> & timeStart, const Mode & mode, const std::string & seedPrivateKey = "") {
     const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - timeStart).count();
 
-    // --- 1. 正确重建偏移量 (256 bit 大端加法) ---
-    cl_ulong4 offset = seed;  // 复制设备随机 seed
+    // --- 1. 正确重建 256 bit 偏移量 ---
+    cl_ulong4 offset = seed;  // 设备随机 seed
 
-    // Step 1: foundId 加到最高 64 bit (s[3])
-    offset.s[3] += r.foundId;  // ulong 自动溢出 ok
+    // 先加 foundId 到最高位 s[3]
+    offset.s[3] += r.foundId;
 
-    // Step 2: round + 1 (init 中的额外 +G) 从低位加
-    cl_ulong add = round + 1;
-    cl_ulong carry = add;
+    // 再从低位加 (round + 1)  // +1 来自 init 的额外 point_add
+    cl_ulong toAdd = round + 1;
+    cl_ulong carry = toAdd;
+
     offset.s[0] += carry;
-    if (offset.s[0] < add) carry = 1; else carry = 0;
+    carry = (offset.s[0] < toAdd) ? 1 : 0;
 
     offset.s[1] += carry;
-    if (carry && offset.s[1] == 0) carry = 1; else carry = 0;  // 等价于 offset.s[1] < carry
+    carry = (offset.s[1] < carry) ? 1 : 0;  // carry 只有 0 或 1
 
     offset.s[2] += carry;
-    if (carry && offset.s[2] == 0) carry = 1; else carry = 0;
+    carry = (offset.s[2] < carry) ? 1 : 0;
 
     offset.s[3] += carry;
-    // s[3] 可能再溢出，但后续 mod N 会处理
+    // 高位可能溢出，但 addPrivateKeys 会 mod N 处理
 
-    // 转为大端 hex 字符串
+    // 转为大端 hex (s[3] 在最左)
     std::ostringstream ss;
     ss << std::hex << std::setfill('0');
     ss << std::setw(16) << offset.s[3]
@@ -336,10 +337,10 @@ static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score
        << std::setw(16) << offset.s[0];
     const std::string strOffset = ss.str();
 
-    // --- 2. 生成 TRON 地址 ---
+    // --- 2. 生成地址 (用内核的 foundHash) ---
     uint8_t tronAddr[21];
     tronAddr[0] = 0x41;
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < 20; ++i) {
         tronAddr[i + 1] = r.foundHash[i];
     }
     std::string strAddress = toBase58Check(tronAddr);
@@ -349,20 +350,18 @@ static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score
     std::cout << strVT100ClearLine << " 时间: " << std::setw(5) << seconds << "s 分数: " << std::setw(2) << (int)score
               << " 地址: " << strAddress << std::endl;
 
-    // --- 4. 计算最终私钥并保存 ---
+    // --- 4. 最终私钥 ---
+    std::string finalPrivateKey;
     if (!seedPrivateKey.empty()) {
-        std::string finalPrivateKey = addPrivateKeys(seedPrivateKey, strOffset);
-        std::string maskedKey = finalPrivateKey.substr(0, 6) + std::string(52, '*') + finalPrivateKey.substr(58, 6);
-        std::cout << " 私钥: 0x" << maskedKey << std::endl;
-        saveToFile(strAddress, "0x" + finalPrivateKey);
+        finalPrivateKey = addPrivateKeys(seedPrivateKey, strOffset);
     } else {
-        // 无 base seed 时，直接输出偏移作为私钥
-        std::string maskedKey = strOffset.substr(0, 6) + std::string(52, '*') + strOffset.substr(58, 6);
-        std::cout << " 私钥: 0x" << maskedKey << std::endl;
-        saveToFile(strAddress, "0x" + strOffset);
+        finalPrivateKey = strOffset;  // 无 base seed 时，直接用偏移
     }
-}
 
+    std::string maskedKey = finalPrivateKey.substr(0, 6) + std::string(52, '*') + finalPrivateKey.substr(58, 6);
+    std::cout << " 私钥: 0x" << maskedKey << std::endl;
+    saveToFile(strAddress, "0x" + finalPrivateKey);
+}
 unsigned int getKernelExecutionTimeMicros(cl_event & e) {
 	cl_ulong timeStart = 0, timeEnd = 0;
 	clWaitForEvents(1, &e);
