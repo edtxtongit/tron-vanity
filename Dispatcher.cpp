@@ -309,26 +309,25 @@ static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score
     // --- 1. 正确重建 256 bit 偏移量 ---
     cl_ulong4 offset = seed;  // 设备随机 seed
 
-    // 先加 foundId 到最高位 s[3]
+    // 先加 foundId 到最高位 s[3]（匹配内核 seed.w + id）
     offset.s[3] += r.foundId;
 
-    // 再从低位加 (round + 1)  // +1 来自 init 的额外 point_add
-    cl_ulong toAdd = round + 1;
+    // 再从低位加 round（根据 onEvent 逻辑，不需要额外 +1）
+    cl_ulong toAdd = round;
     cl_ulong carry = toAdd;
 
     offset.s[0] += carry;
-    carry = (offset.s[0] < toAdd) ? 1 : 0;
+    carry = (offset.s[0] < toAdd) ? 1ULL : 0ULL;
 
     offset.s[1] += carry;
-    carry = (offset.s[1] < carry) ? 1 : 0;  // carry 只有 0 或 1
+    carry = (offset.s[1] < carry) ? 1ULL : 0ULL;
 
     offset.s[2] += carry;
-    carry = (offset.s[2] < carry) ? 1 : 0;
+    carry = (offset.s[2] < carry) ? 1ULL : 0ULL;
 
     offset.s[3] += carry;
-    // 高位可能溢出，但 addPrivateKeys 会 mod N 处理
 
-    // 转为大端 hex (s[3] 在最左)
+    // 转为大端 hex (s[3] 最左)
     std::ostringstream ss;
     ss << std::hex << std::setfill('0');
     ss << std::setw(16) << offset.s[3]
@@ -337,7 +336,7 @@ static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score
        << std::setw(16) << offset.s[0];
     const std::string strOffset = ss.str();
 
-    // --- 2. 生成地址 (用内核的 foundHash) ---
+    // --- 2. 生成地址 ---
     uint8_t tronAddr[21];
     tronAddr[0] = 0x41;
     for (int i = 0; i < 20; ++i) {
@@ -355,7 +354,7 @@ static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score
     if (!seedPrivateKey.empty()) {
         finalPrivateKey = addPrivateKeys(seedPrivateKey, strOffset);
     } else {
-        finalPrivateKey = strOffset;  // 无 base seed 时，直接用偏移
+        finalPrivateKey = strOffset;
     }
 
     std::string maskedKey = finalPrivateKey.substr(0, 6) + std::string(52, '*') + finalPrivateKey.substr(58, 6);
