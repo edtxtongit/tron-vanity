@@ -304,63 +304,63 @@ static void saveToFile(const std::string& address, const std::string& privateKey
 }
 
 static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score, const std::chrono::time_point<std::chrono::steady_clock> & timeStart, const Mode & mode, const std::string & seedPrivateKey = "") {
-	const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - timeStart).count();
+    const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - timeStart).count();
 
-	// --- 1. 修正私钥偏移量计算 ---
-	cl_ulong4 seedRes;
-	cl_ulong carry = 0;
+    // --- 1. 正确重建偏移量 (256 bit 大端加法) ---
+    cl_ulong4 offset = seed;  // 复制设备随机 seed
 
-	// GPU 偏移量 (foundId) 和 CPU 轮数 (round) 应该加在最低位 s[0]
-	cl_ulong totalLow = round + r.foundId;
-	
-	// 计算 s[0] 并处理进位
-	seedRes.s[0] = seed.s[0] + totalLow;
-	carry = (seedRes.s[0] < totalLow) ? 1 : 0;
+    // Step 1: foundId 加到最高 64 bit (s[3])
+    offset.s[3] += r.foundId;  // ulong 自动溢出 ok
 
-	// 处理 s[1] 的进位
-	seedRes.s[1] = seed.s[1] + carry;
-	carry = (carry != 0 && seedRes.s[1] == 0) ? 1 : 0;
+    // Step 2: round + 1 (init 中的额外 +G) 从低位加
+    cl_ulong add = round + 1;
+    cl_ulong carry = add;
+    offset.s[0] += carry;
+    if (offset.s[0] < add) carry = 1; else carry = 0;
 
-	// 处理 s[2] 的进位
-	seedRes.s[2] = seed.s[2] + carry;
-	carry = (carry != 0 && seedRes.s[2] == 0) ? 1 : 0;
+    offset.s[1] += carry;
+    if (carry && offset.s[1] == 0) carry = 1; else carry = 0;  // 等价于 offset.s[1] < carry
 
-	// 处理 s[3]
-	seedRes.s[3] = seed.s[3] + carry;
+    offset.s[2] += carry;
+    if (carry && offset.s[2] == 0) carry = 1; else carry = 0;
 
-	// 将偏移量格式化为 64 位大端序十六进制字符串
-	std::ostringstream ss;
-	ss << std::hex << std::setfill('0');
-	ss << std::setw(16) << seedRes.s[3] 
-	   << std::setw(16) << seedRes.s[2] 
-	   << std::setw(16) << seedRes.s[1] 
-	   << std::setw(16) << seedRes.s[0];
-	const std::string strPrivate = ss.str();
+    offset.s[3] += carry;
+    // s[3] 可能再溢出，但后续 mod N 会处理
 
-	// --- 2. 生成波场地址 (Base58Check) ---
-	uint8_t tronAddr[21];
-	tronAddr[0] = 0x41; // 波场主网前缀
-	for (int i = 0; i < 20; i++) {
-		tronAddr[i + 1] = r.foundHash[i];
-	}
-	std::string strAddress = toBase58Check(tronAddr);
+    // 转为大端 hex 字符串
+    std::ostringstream ss;
+    ss << std::hex << std::setfill('0');
+    ss << std::setw(16) << offset.s[3]
+       << std::setw(16) << offset.s[2]
+       << std::setw(16) << offset.s[1]
+       << std::setw(16) << offset.s[0];
+    const std::string strOffset = ss.str();
 
-	// --- 3. 打印结果 ---
-	const std::string strVT100ClearLine = "\33[2K\r";
-	std::cout << strVT100ClearLine << "  时间: " << std::setw(5) << seconds << "s 分数: " << std::setw(2) << (int)score
-	          << " 地址: " << strAddress << std::endl;
+    // --- 2. 生成 TRON 地址 ---
+    uint8_t tronAddr[21];
+    tronAddr[0] = 0x41;
+    for (int i = 0; i < 20; i++) {
+        tronAddr[i + 1] = r.foundHash[i];
+    }
+    std::string strAddress = toBase58Check(tronAddr);
 
-	// --- 4. 计算并保存最终私钥 ---
-	if (!seedPrivateKey.empty()) {
-		// 使用 addPrivateKeys 执行 (种子私钥 + 计算出的偏移量) mod N
-		std::string finalPrivateKey = addPrivateKeys(seedPrivateKey, strPrivate);
-		
-		// 掩码显示，保护隐私
-		std::string maskedKey = finalPrivateKey.substr(0, 6) + std::string(52, '*') + finalPrivateKey.substr(58, 6);
-		std::cout << "  私钥: 0x" << maskedKey << std::endl;
-		
-		saveToFile(strAddress, "0x" + finalPrivateKey);
-	}
+    // --- 3. 打印 ---
+    const std::string strVT100ClearLine = "\33[2K\r";
+    std::cout << strVT100ClearLine << " 时间: " << std::setw(5) << seconds << "s 分数: " << std::setw(2) << (int)score
+              << " 地址: " << strAddress << std::endl;
+
+    // --- 4. 计算最终私钥并保存 ---
+    if (!seedPrivateKey.empty()) {
+        std::string finalPrivateKey = addPrivateKeys(seedPrivateKey, strOffset);
+        std::string maskedKey = finalPrivateKey.substr(0, 6) + std::string(52, '*') + finalPrivateKey.substr(58, 6);
+        std::cout << " 私钥: 0x" << maskedKey << std::endl;
+        saveToFile(strAddress, "0x" + finalPrivateKey);
+    } else {
+        // 无 base seed 时，直接输出偏移作为私钥
+        std::string maskedKey = strOffset.substr(0, 6) + std::string(52, '*') + strOffset.substr(58, 6);
+        std::cout << " 私钥: 0x" << maskedKey << std::endl;
+        saveToFile(strAddress, "0x" + strOffset);
+    }
 }
 
 unsigned int getKernelExecutionTimeMicros(cl_event & e) {
