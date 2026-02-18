@@ -308,9 +308,9 @@ static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score
 
     // --- 1. 正确重建 256 bit 偏移量 ---
     cl_ulong4 offset = seed; // 设备随机 seed
-    // 先加 foundId 到最高位 s[3]（匹配内核 seed.w + id）
-    offset.s[3] += r.foundId;
-    // 再从低位加 round（根据 onEvent 逻辑，不需要额外 +1）
+    // 不再加 foundId（内核已经加过了）
+
+    // 从低位加 round
     cl_ulong toAdd = round;
     cl_ulong carry = toAdd;
     offset.s[0] += carry;
@@ -320,7 +320,8 @@ static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score
     offset.s[2] += carry;
     carry = (offset.s[2] < carry) ? 1ULL : 0ULL;
     offset.s[3] += carry;
-    // 转为大端 hex (s[3] 最左)
+
+    // 转为大端 hex
     std::ostringstream ss;
     ss << std::hex << std::setfill('0');
     ss << std::setw(16) << offset.s[3]
@@ -328,6 +329,11 @@ static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score
        << std::setw(16) << offset.s[1]
        << std::setw(16) << offset.s[0];
     const std::string strOffset = ss.str();
+	const std::string strVT100ClearLine = "\33[2K\r";
+    // --- 添加调试打印 ---
+    std::cout << "Debug: round = " << round << std::endl;
+    std::cout << "Debug: foundId = " << r.foundId << std::endl;
+    std::flush(std::cout);
 
     // --- 2. 生成地址 ---
     uint8_t tronAddr[21];
@@ -336,12 +342,6 @@ static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score
         tronAddr[i + 1] = r.foundHash[i];
     }
     std::string strAddress = toBase58Check(tronAddr);
-
-    // --- 添加调试打印 (移到这里) ---
-    const std::string strVT100ClearLine = "\33[2K\r";
-    std::cout << strVT100ClearLine << "Debug: round = " << round << std::endl;
-    std::cout << strVT100ClearLine << "Debug: foundId = " << r.foundId << std::endl;
-    std::flush(std::cout);  // 刷新确保输出
 
     // --- 3. 打印 ---
     std::cout << strVT100ClearLine << " 时间: " << std::setw(5) << seconds << "s 分数: " << std::setw(2) << (int)score
