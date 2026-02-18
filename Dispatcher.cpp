@@ -329,11 +329,6 @@ static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score
        << std::setw(16) << offset.s[0];
     const std::string strOffset = ss.str();
 
-    // --- 添加调试打印 (移到这里) ---
-    std::cout << "Debug: round = " << round << std::endl;
-    std::cout << "Debug: foundId = " << r.foundId << std::endl;
-    std::flush(std::cout);  // 刷新输出，确保不被速度打印干扰
-
     // --- 2. 生成地址 ---
     uint8_t tronAddr[21];
     tronAddr[0] = 0x41;
@@ -342,8 +337,13 @@ static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score
     }
     std::string strAddress = toBase58Check(tronAddr);
 
-    // --- 3. 打印 ---
+    // --- 添加调试打印 (移到这里) ---
     const std::string strVT100ClearLine = "\33[2K\r";
+    std::cout << strVT100ClearLine << "Debug: round = " << round << std::endl;
+    std::cout << strVT100ClearLine << "Debug: foundId = " << r.foundId << std::endl;
+    std::flush(std::cout);  // 刷新确保输出
+
+    // --- 3. 打印 ---
     std::cout << strVT100ClearLine << " 时间: " << std::setw(5) << seconds << "s 分数: " << std::setw(2) << (int)score
               << " 地址: " << strAddress << std::endl;
 
