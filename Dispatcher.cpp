@@ -303,60 +303,131 @@ static void saveToFile(const std::string& address, const std::string& privateKey
 	}
 }
 
-static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score, const std::chrono::time_point<std::chrono::steady_clock> & timeStart, const Mode & mode, const std::string & seedPrivateKey = "") {
-    const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - timeStart).count();
+static void printResult(
+    cl_ulong4 seed,
+    cl_ulong round,
+    result r,
+    cl_uchar score,
+    const std::chrono::time_point<std::chrono::steady_clock>& timeStart,
+    const Mode& mode,
+    const std::string& seedPrivateKey = "")
+{
+    const auto seconds =
+        std::chrono::duration_cast<std::chrono::seconds>(
+            std::chrono::steady_clock::now() - timeStart).count();
 
-    // --- 1. 正确重建 256 bit 偏移量 ---
-    cl_ulong4 offset = seed; // 设备随机 seed
-    // 不再加 foundId（内核已经加过了）
+    // ============================================================
+    // 1. 还原 GPU 实际使用的 256bit 私钥偏移
+    // ============================================================
 
-    // 从低位加 round
-    cl_ulong toAdd = round;
-    cl_ulong carry = toAdd;
-    offset.s[0] += carry;
-    carry = (offset.s[0] < toAdd) ? 1ULL : 0ULL;
-    offset.s[1] += carry;
-    carry = (offset.s[1] < carry) ? 1ULL : 0ULL;
-    offset.s[2] += carry;
-    carry = (offset.s[2] < carry) ? 1ULL : 0ULL;
-    offset.s[3] += carry;
+    cl_ulong4 offset = seed;  // seed 是小端：s[0] 最低位
 
-    // 转为大端 hex
+    // ---- Step 1: seed.w + id 实际等价于 s[0] + id ----
+    cl_ulong carry = 0;
+
+    cl_ulong old = offset.s[0];
+    offset.s[0] += r.foundId;
+    carry = (offset.s[0] < old) ? 1 : 0;
+
+    // 进位传播
+    if (carry) {
+        old = offset.s[1];
+        offset.s[1] += 1;
+        carry = (offset.s[1] < old) ? 1 : 0;
+    }
+    if (carry) {
+        old = offset.s[2];
+        offset.s[2] += 1;
+        carry = (offset.s[2] < old) ? 1 : 0;
+    }
+    if (carry) {
+        offset.s[3] += 1;
+    }
+
+    // ---- Step 2: 加 (round + 1) ----
+    cl_ulong add = round + 1;
+
+    old = offset.s[0];
+    offset.s[0] += add;
+    carry = (offset.s[0] < old) ? 1 : 0;
+
+    if (carry) {
+        old = offset.s[1];
+        offset.s[1] += 1;
+        carry = (offset.s[1] < old) ? 1 : 0;
+    }
+    if (carry) {
+        old = offset.s[2];
+        offset.s[2] += 1;
+        carry = (offset.s[2] < old) ? 1 : 0;
+    }
+    if (carry) {
+        offset.s[3] += 1;
+    }
+
+    // ============================================================
+    // 2. 转成大端 hex 字符串
+    // ============================================================
+
     std::ostringstream ss;
     ss << std::hex << std::setfill('0');
     ss << std::setw(16) << offset.s[3]
        << std::setw(16) << offset.s[2]
        << std::setw(16) << offset.s[1]
        << std::setw(16) << offset.s[0];
-    const std::string strOffset = ss.str();
-	const std::string strVT100ClearLine = "\33[2K\r";
-    // --- 添加调试打印 ---
-    std::cout << strVT100ClearLine << "Debug: round = " << round << std::endl;
-    std::cout << strVT100ClearLine << "Debug: foundId = " << r.foundId << std::endl;
-    std::flush(std::cout);  // 刷新确保输出
 
-    // --- 2. 生成地址 ---
+    const std::string strOffset = ss.str();
+
+    // ============================================================
+    // 3. 生成 TRON 地址
+    // ============================================================
+
     uint8_t tronAddr[21];
     tronAddr[0] = 0x41;
-    for (int i = 0; i < 20; ++i) {
+    for (int i = 0; i < 20; i++) {
         tronAddr[i + 1] = r.foundHash[i];
     }
+
     std::string strAddress = toBase58Check(tronAddr);
 
-    // --- 3. 打印 ---
-    std::cout << strVT100ClearLine << " 时间: " << std::setw(5) << seconds << "s 分数: " << std::setw(2) << (int)score
+    // ============================================================
+    // 4. 输出
+    // ============================================================
+
+    const std::string strVT100ClearLine = "\33[2K\r";
+    std::cout << strVT100ClearLine
+              << " 时间: " << std::setw(5) << seconds
+              << "s 分数: " << std::setw(2) << (int)score
               << " 地址: " << strAddress << std::endl;
 
-    // --- 4. 最终私钥 ---
-    std::string finalPrivateKey;
+    // ============================================================
+    // 5. 最终私钥
+    // ============================================================
+
     if (!seedPrivateKey.empty()) {
-        finalPrivateKey = addPrivateKeys(seedPrivateKey, strOffset);
-    } else {
-        finalPrivateKey = strOffset;
+        // 最终私钥 = 基础私钥 + offset
+        std::string finalPrivateKey =
+            addPrivateKeys(seedPrivateKey, strOffset);
+
+        std::string maskedKey =
+            finalPrivateKey.substr(0, 6) +
+            std::string(52, '*') +
+            finalPrivateKey.substr(58, 6);
+
+        std::cout << " 私钥: 0x" << maskedKey << std::endl;
+
+        saveToFile(strAddress, "0x" + finalPrivateKey);
     }
-    std::string maskedKey = finalPrivateKey.substr(0, 6) + std::string(52, '*') + finalPrivateKey.substr(58, 6);
-    std::cout << " 私钥: 0x" << maskedKey << std::endl;
-    saveToFile(strAddress, "0x" + finalPrivateKey);
+    else {
+        std::string maskedKey =
+            strOffset.substr(0, 6) +
+            std::string(52, '*') +
+            strOffset.substr(58, 6);
+
+        std::cout << " 私钥: 0x" << maskedKey << std::endl;
+
+        saveToFile(strAddress, "0x" + strOffset);
+    }
 }
 unsigned int getKernelExecutionTimeMicros(cl_event & e) {
 	cl_ulong timeStart = 0, timeEnd = 0;
