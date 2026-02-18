@@ -307,26 +307,19 @@ static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score
     const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - timeStart).count();
 
     // --- 1. 正确重建 256 bit 偏移量 ---
-    cl_ulong4 offset = seed;  // 设备随机 seed
-
+    cl_ulong4 offset = seed; // 设备随机 seed
     // 先加 foundId 到最高位 s[3]（匹配内核 seed.w + id）
     offset.s[3] += r.foundId;
-
     // 再从低位加 round（根据 onEvent 逻辑，不需要额外 +1）
     cl_ulong toAdd = round;
     cl_ulong carry = toAdd;
-
     offset.s[0] += carry;
     carry = (offset.s[0] < toAdd) ? 1ULL : 0ULL;
-
     offset.s[1] += carry;
     carry = (offset.s[1] < carry) ? 1ULL : 0ULL;
-
     offset.s[2] += carry;
     carry = (offset.s[2] < carry) ? 1ULL : 0ULL;
-
     offset.s[3] += carry;
-
     // 转为大端 hex (s[3] 最左)
     std::ostringstream ss;
     ss << std::hex << std::setfill('0');
@@ -335,6 +328,10 @@ static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score
        << std::setw(16) << offset.s[1]
        << std::setw(16) << offset.s[0];
     const std::string strOffset = ss.str();
+
+    // --- 添加调试打印 ---
+    std::cout << "Debug: round = " << round << std::endl;
+    std::cout << "Debug: foundId = " << r.foundId << std::endl;
 
     // --- 2. 生成地址 ---
     uint8_t tronAddr[21];
@@ -356,7 +353,6 @@ static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score
     } else {
         finalPrivateKey = strOffset;
     }
-
     std::string maskedKey = finalPrivateKey.substr(0, 6) + std::string(52, '*') + finalPrivateKey.substr(58, 6);
     std::cout << " 私钥: 0x" << maskedKey << std::endl;
     saveToFile(strAddress, "0x" + finalPrivateKey);
