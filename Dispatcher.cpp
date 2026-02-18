@@ -331,9 +331,9 @@ static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score
     const std::string strOffset = ss.str();
 	const std::string strVT100ClearLine = "\33[2K\r";
     // --- 添加调试打印 ---
-    std::cout << "Debug: round = " << round << std::endl;
-    std::cout << "Debug: foundId = " << r.foundId << std::endl;
-    std::flush(std::cout);
+    std::cout << strVT100ClearLine << "Debug: round = " << round << std::endl;
+    std::cout << strVT100ClearLine << "Debug: foundId = " << r.foundId << std::endl;
+    std::flush(std::cout);  // 刷新确保输出
 
     // --- 2. 生成地址 ---
     uint8_t tronAddr[21];
