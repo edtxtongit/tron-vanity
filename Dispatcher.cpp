@@ -680,8 +680,8 @@ void Dispatcher::onEvent(cl_event event, cl_int status, Device & d) {
 	else if (d.m_eventFinished != NULL) {
 		initContinue(d);
 	} else {
-		++d.m_round;
-		handleResult(d);
+		handleResult(d);   // ✅ 先处理结果（使用当前 m_round）
+        ++d.m_round;       // ✅ 再自增
 
 		bool bDispatch = true;
 		{
