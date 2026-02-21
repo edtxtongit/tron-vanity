@@ -310,7 +310,17 @@ static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score
 	cl_ulong carry = 0;
 	cl_ulong4 seedRes;
 
-	seedRes.s[0] = seed.s[0] + round; carry = seedRes.s[0] < round;
+	// 【修改点 1】：先定义完整的偏移量
+	cl_ulong offset = round + 2; 
+
+	// 【修改点 2】：执行加法
+	seedRes.s[0] = seed.s[0] + offset; 
+	
+	// 【修改点 3】：正确的进位检测
+	// 如果结果比加数小，说明发生了溢出 (Wrap around)
+	carry = (seedRes.s[0] < offset) ? 1 : 0; 
+
+	// 后续逻辑保持不变
 	seedRes.s[1] = seed.s[1] + carry; carry = (carry && seedRes.s[1] == 0);
 	seedRes.s[2] = seed.s[2] + carry; carry = (carry && seedRes.s[2] == 0);
 	seedRes.s[3] = seed.s[3] + carry + r.foundId;
@@ -320,6 +330,7 @@ static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score
 	ss << std::setw(16) << seedRes.s[3] << std::setw(16) << seedRes.s[2] << std::setw(16) << seedRes.s[1] << std::setw(16) << seedRes.s[0];
 	const std::string strPrivate = ss.str();
 
+	// ... 后面的代码完全不需要动 ...
 	// Generate TRON address (Base58Check encoding)
 	uint8_t tronAddr[21];
 	tronAddr[0] = 0x41;
@@ -328,15 +339,12 @@ static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score
 	}
 	std::string strAddress = toBase58Check(tronAddr);
 
-	// Print result
 	const std::string strVT100ClearLine = "\33[2K\r";
 	std::cout << strVT100ClearLine << "  时间: " << std::setw(5) << seconds << "s 分数: " << std::setw(2) << (int)score
 	          << " 地址: " << strAddress << std::endl;
 
-	// Calculate final private key and save to file
 	if (!seedPrivateKey.empty()) {
 		std::string finalPrivateKey = addPrivateKeys(seedPrivateKey, strPrivate);
-		// 加密显示私钥：只显示前6位和后6位，中间用*号代替
 		std::string maskedKey = finalPrivateKey.substr(0, 6) + std::string(52, '*') + finalPrivateKey.substr(58, 6);
 		std::cout << "  私钥: 0x" << maskedKey << std::endl;
 		saveToFile(strAddress, "0x" + finalPrivateKey);
