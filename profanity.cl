@@ -645,31 +645,26 @@ __kernel void profanity_iterate(__global mp_number * const pDeltaX, __global mp_
 	mp_mod_sub_const(&tmp, &negativeGy, &tmp);
 
 	// Restore X coordinate from delta value
-	// Restore X coordinate from delta value
 	mp_mod_sub(&dX, &dX, &negativeGx);
 
-	uint x0 = bswap32(dX.d[7]), x1 = bswap32(dX.d[6]), x2 = bswap32(dX.d[5]), x3 = bswap32(dX.d[4]);
-	uint x4 = bswap32(dX.d[3]), x5 = bswap32(dX.d[2]), x6 = bswap32(dX.d[1]), x7 = bswap32(dX.d[0]);
-	uint y0 = bswap32(tmp.d[7]), y1 = bswap32(tmp.d[6]), y2 = bswap32(tmp.d[5]), y3 = bswap32(tmp.d[4]);
-	uint y4 = bswap32(tmp.d[3]), y5 = bswap32(tmp.d[2]), y6 = bswap32(tmp.d[1]), y7 = bswap32(tmp.d[0]);
-
-	h.d[0]  = 0x04000000 | (x0 >> 8);
-	h.d[1]  = (x0 << 24) | (x1 >> 8);
-	h.d[2]  = (x1 << 24) | (x2 >> 8);
-	h.d[3]  = (x2 << 24) | (x3 >> 8);
-	h.d[4]  = (x3 << 24) | (x4 >> 8);
-	h.d[5]  = (x4 << 24) | (x5 >> 8);
-	h.d[6]  = (x5 << 24) | (x6 >> 8);
-	h.d[7]  = (x6 << 24) | (x7 >> 8);
-	h.d[8]  = (x7 << 24) | (y0 >> 8);
-	h.d[9]  = (y0 << 24) | (y1 >> 8);
-	h.d[10] = (y1 << 24) | (y2 >> 8);
-	h.d[11] = (y2 << 24) | (y3 >> 8);
-	h.d[12] = (y3 << 24) | (y4 >> 8);
-	h.d[13] = (y4 << 24) | (y5 >> 8);
-	h.d[14] = (y5 << 24) | (y6 >> 8);
-	h.d[15] = (y6 << 24) | (y7 >> 8);
-	h.d[16] = (y7 << 24) | 0x00010000;   // 65字节输入，0x01 补位在第65字节
+	// Initialize Keccak structure with point coordinates in big endian
+	h.d[0] = bswap32(dX.d[MP_WORDS - 1]);
+	h.d[1] = bswap32(dX.d[MP_WORDS - 2]);
+	h.d[2] = bswap32(dX.d[MP_WORDS - 3]);
+	h.d[3] = bswap32(dX.d[MP_WORDS - 4]);
+	h.d[4] = bswap32(dX.d[MP_WORDS - 5]);
+	h.d[5] = bswap32(dX.d[MP_WORDS - 6]);
+	h.d[6] = bswap32(dX.d[MP_WORDS - 7]);
+	h.d[7] = bswap32(dX.d[MP_WORDS - 8]);
+	h.d[8] = bswap32(tmp.d[MP_WORDS - 1]);
+	h.d[9] = bswap32(tmp.d[MP_WORDS - 2]);
+	h.d[10] = bswap32(tmp.d[MP_WORDS - 3]);
+	h.d[11] = bswap32(tmp.d[MP_WORDS - 4]);
+	h.d[12] = bswap32(tmp.d[MP_WORDS - 5]);
+	h.d[13] = bswap32(tmp.d[MP_WORDS - 6]);
+	h.d[14] = bswap32(tmp.d[MP_WORDS - 7]);
+	h.d[15] = bswap32(tmp.d[MP_WORDS - 8]);
+	h.d[16] ^= 0x01; // length 64
 
 	sha3_keccakf(&h);
 
@@ -1098,4 +1093,3 @@ __kernel void profanity_score_tron_lucky(__global mp_number * const pInverse, __
 
 	profanity_result_update(id, hash, pResult, score, scoreMax);
 }
-
