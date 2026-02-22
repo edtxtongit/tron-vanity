@@ -339,7 +339,7 @@ static void printResult(cl_ulong4 seed, cl_ulong round, result r, cl_uchar score
 	cl_ulong4 seedRes;
 
 	// 【修改点 1】：先定义完整的偏移量
-	cl_ulong offset = round + 2; 
+	cl_ulong offset = round + 1; 
 
 	// 【修改点 2】：执行加法
 	seedRes.s[0] = seed.s[0] + offset; 
