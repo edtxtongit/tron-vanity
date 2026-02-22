@@ -158,19 +158,37 @@ inline BigInt256 modP(const BigInt256& a) {
     return r;
 }
 
-// Modular addition
+// Modular addition (修复了 256 位溢出截断的问题)
 inline BigInt256 addMod(const BigInt256& a, const BigInt256& b) {
-    BigInt256 r = a.add(b);
-    if (r.compare(SECP256K1_P) >= 0) {
+    BigInt256 r;
+    uint64_t carry = 0;
+    for (int i = 0; i < 4; i++) {
+        __uint128_t sum = (__uint128_t)a.d[i] + b.d[i] + carry;
+        r.d[i] = (uint64_t)sum;
+        carry = (uint64_t)(sum >> 64);
+    }
+    
+    if (carry) {
+        // 如果 256 位溢出，相当于在模 P 下丢弃了 2^256
+        // 因为 2^256 ≡ 2^32 + 977 (mod P)，所以我们需要把这个差值加回来
+        BigInt256 c;
+        c.d[0] = 0x1000003D1ULL; // 2^32 + 977
+        r = addMod(r, c); // 递归加回差值
+    } else if (r.compare(SECP256K1_P) >= 0) {
         r = r.sub(SECP256K1_P);
     }
     return r;
 }
 
-// Modular subtraction
+// Modular subtraction (修复了 256 位下溢出崩溃的问题)
 inline BigInt256 subMod(const BigInt256& a, const BigInt256& b) {
     if (a.compare(b) < 0) {
-        return a.add(SECP256K1_P).sub(b);
+        // 如果 a < b，a - b 会发生 256 位下溢出 (等同于加上了 2^256)
+        BigInt256 r = a.sub(b);
+        // 为了在模 P 下保持平衡，我们必须减去多出来的 (2^32 + 977)
+        BigInt256 c;
+        c.d[0] = 0x1000003D1ULL; 
+        return subMod(r, c); // 递归扣除差值
     }
     return a.sub(b);
 }
