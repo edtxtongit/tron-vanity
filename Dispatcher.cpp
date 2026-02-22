@@ -186,28 +186,56 @@ static std::string::size_type fromHex(char c) {
 
 static cl_ulong4 fromHex(const std::string & strHex) {
 	uint8_t data[32];
-	std::fill(data, data + sizeof(data), cl_uchar(0));
+	// 初始化为0，防止字符串短于64字符时出错
+	std::fill(data, data + sizeof(data), 0);
 
-	auto index = 0;
-	for(size_t i = 0; i < strHex.size(); i += 2) {
+	// 解析 Hex 字符串到 data 数组
+	// data[0] 是最高位字节，data[31] 是最低位字节
+	size_t len = strHex.size();
+	for(size_t i = 0; i < len; i += 2) {
 		const auto indexHi = fromHex(strHex[i]);
-		const auto indexLo = i + 1 < strHex.size() ? fromHex(strHex[i+1]) : std::string::npos;
+		const auto indexLo = i + 1 < len ? fromHex(strHex[i+1]) : 0; // 处理奇数长度
 
 		const auto valHi = (indexHi == std::string::npos) ? 0 : indexHi << 4;
 		const auto valLo = (indexLo == std::string::npos) ? 0 : indexLo;
 
-		data[index] = valHi | valLo;
-		++index;
+		// 存入 data 数组
+		// 注意：如果字符串不足 64 字符，这里是从左往右填。
+		// 标准私钥/公钥字符串应该是 64 字符长。
+		// 如果不足，通常应该前补 0。这里的逻辑是左对齐，如果你的输入是完整的64字符没问题。
+		if (i/2 < 32) {
+			data[i/2] = valHi | valLo;
+		}
 	}
 
-	cl_ulong4 res = {
-		.s = {
-			htonll(*(uint64_t *)(data + 24)),
-			htonll(*(uint64_t *)(data + 16)),
-			htonll(*(uint64_t *)(data + 8)),
-			htonll(*(uint64_t *)(data + 0)),
-		}
-	};
+	// 【手动拼装 cl_ulong4】
+	// 绝对安全的移位操作，不依赖字节序
+	cl_ulong4 res;
+
+	// s[3] - 最高 64 位 (Bytes 0-7)
+	res.s[3] = ((cl_ulong)data[0] << 56) | ((cl_ulong)data[1] << 48) |
+	           ((cl_ulong)data[2] << 40) | ((cl_ulong)data[3] << 32) |
+	           ((cl_ulong)data[4] << 24) | ((cl_ulong)data[5] << 16) |
+	           ((cl_ulong)data[6] << 8)  | ((cl_ulong)data[7]);
+
+	// s[2] - 次高 64 位 (Bytes 8-15)
+	res.s[2] = ((cl_ulong)data[8] << 56) | ((cl_ulong)data[9] << 48) |
+	           ((cl_ulong)data[10] << 40) | ((cl_ulong)data[11] << 32) |
+	           ((cl_ulong)data[12] << 24) | ((cl_ulong)data[13] << 16) |
+	           ((cl_ulong)data[14] << 8)  | ((cl_ulong)data[15]);
+
+	// s[1] - 次低 64 位 (Bytes 16-23)
+	res.s[1] = ((cl_ulong)data[16] << 56) | ((cl_ulong)data[17] << 48) |
+	           ((cl_ulong)data[18] << 40) | ((cl_ulong)data[19] << 32) |
+	           ((cl_ulong)data[20] << 24) | ((cl_ulong)data[21] << 16) |
+	           ((cl_ulong)data[22] << 8)  | ((cl_ulong)data[23]);
+
+	// s[0] - 最低 64 位 (Bytes 24-31)
+	res.s[0] = ((cl_ulong)data[24] << 56) | ((cl_ulong)data[25] << 48) |
+	           ((cl_ulong)data[26] << 40) | ((cl_ulong)data[27] << 32) |
+	           ((cl_ulong)data[28] << 24) | ((cl_ulong)data[29] << 16) |
+	           ((cl_ulong)data[30] << 8)  | ((cl_ulong)data[31]);
+
 	return res;
 }
 
