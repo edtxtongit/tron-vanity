@@ -23,7 +23,7 @@ jobs:
 
       - name: Build
         # 核心修改：在 make 时传入静态链接参数
-        run: make LDFLAGS="-static-libgcc -static-libstdc++"
+        run: make LDFLAGS="-static-libgcc -static-libstdc++" LIBS="-lOpenCL -lpthread"
 
       - name: Package
         run: |
