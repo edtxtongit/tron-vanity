@@ -317,16 +317,16 @@ public:
 
     void generate() {
         // Generate random 256-bit private key
+        // 直接使用操作系统熵源，每次 rd() 提供 32 位真随机
+        // 8 次调用 × 32 位 = 256 位独立熵 → 种子空间 2^256
         std::random_device rd;
-        std::mt19937_64 gen(rd());
-        std::uniform_int_distribution<uint64_t> dis;
 
         BigInt256 privKey;
         do {
-            privKey.d[0] = dis(gen);
-            privKey.d[1] = dis(gen);
-            privKey.d[2] = dis(gen);
-            privKey.d[3] = dis(gen);
+            privKey.d[0] = ((uint64_t)rd() << 32) | (uint64_t)rd();
+            privKey.d[1] = ((uint64_t)rd() << 32) | (uint64_t)rd();
+            privKey.d[2] = ((uint64_t)rd() << 32) | (uint64_t)rd();
+            privKey.d[3] = ((uint64_t)rd() << 32) | (uint64_t)rd();
         } while (privKey.isZero() || privKey.compare(SECP256K1_N) >= 0);
 
         privateKey = privKey.toHex();
